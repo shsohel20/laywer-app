@@ -1,133 +1,160 @@
-// The ink tab bar.
+// Tab bar — the expanding pill.
 //
-// Two different bars, one per role — a client browses lawyers and a lawyer
-// triages requests, so the first and third slots differ. Everything else is
-// shared, which is why this is one component with a per-role tab list rather
-// than two.
+// An ink bar of bare icons where the active tab expands into a yellow pill
+// carrying its label. Only one label is on screen at a time, so the pill is as
+// wide as its own text and the rest of the row redistributes around it.
+//
+// That reflow IS the state change, which is why there is no separate indicator
+// and why the animation is a layout transition rather than a moving element:
+// the pill has no fixed width to slide to, so its size has to come from the
+// label. Laying it out and letting Reanimated interpolate the result keeps the
+// two in step without measuring text by hand.
 
-import { router, usePathname, type Href } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { router, usePathname } from "expo-router";
+import { Pressable, StyleSheet, View } from "react-native";
+import Animated, { FadeIn, LinearTransition, useReducedMotion } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Icon, type IconName } from "@/components/ui";
+import { Icon } from "@/components/ui";
 import { useBadges, useSession } from "@/state/app-state";
-import { colors, layout, radius, type } from "@/theme";
-import type { Role } from "@/types";
+import { colors, fonts, layout, radius, spacing } from "@/theme";
 
-interface TabDef {
-  key: string;
-  label: string;
-  icon: IconName;
-  href: Href;
-  /** Routes that also light this tab, e.g. a post detail under Posts. */
-  alsoMatches?: string[];
-  /** Which unread counter, if any, puts a dot on this tab. */
-  badge?: "messages" | "requests";
-}
+import { isTabActive, tabsForRole, type TabDef } from "./tabs";
 
-const CLIENT_TABS: TabDef[] = [
-  { key: "lawyers", label: "Lawyers", icon: "nav-lawyers", href: "/lawyers" },
-  { key: "posts", label: "Posts", icon: "nav-posts", href: "/posts", alsoMatches: ["/posts/"] },
-  { key: "home", label: "Home", icon: "nav-home", href: "/", alsoMatches: ["/alerts"] },
-  { key: "messages", label: "Messages", icon: "chat", href: "/messages", badge: "messages" },
-  { key: "account", label: "Account", icon: "nav-account", href: "/account" },
-];
+/** Height of the live row, above the safe-area inset. */
+const ROW_HEIGHT = layout.touchTarget;
+/** Width of a tab showing only its icon. */
+const ICON_SLOT_WIDTH = 48;
 
-const LAWYER_TABS: TabDef[] = [
-  { key: "inbox", label: "Requests", icon: "bookmark", href: "/inbox", badge: "requests" },
-  { key: "posts", label: "Posts", icon: "nav-posts", href: "/posts", alsoMatches: ["/posts/"] },
-  {
-    key: "practice",
-    label: "Practice",
-    icon: "nav-practice",
-    href: "/practice",
-    alsoMatches: ["/alerts"],
-  },
-  { key: "messages", label: "Clients", icon: "chat", href: "/messages", badge: "messages" },
-  { key: "account", label: "Account", icon: "nav-account", href: "/account" },
-];
-
-export function tabsForRole(role: Role): TabDef[] {
-  return role === "lawyer" ? LAWYER_TABS : CLIENT_TABS;
-}
-
-function isActive(tab: TabDef, pathname: string): boolean {
-  const target = String(tab.href);
-  if (target === "/") {
-    // Home would otherwise match every route.
-    return pathname === "/" || (tab.alsoMatches?.includes(pathname) ?? false);
-  }
-  if (pathname === target) return true;
-  return tab.alsoMatches?.some((prefix) => pathname.startsWith(prefix)) ?? false;
-}
+/**
+ * Settled but not sluggish: no overshoot past the new width, ~280ms to rest.
+ */
+const TRANSITION = LinearTransition.springify().damping(18).stiffness(190).mass(0.7);
 
 export function AppTabBar() {
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
   const { role } = useSession();
   const { unreadChatCount, newRequestCount } = useBadges();
+  const reducedMotion = useReducedMotion();
 
   const tabs = tabsForRole(role);
 
   return (
-    <View style={[styles.bar, { paddingBottom: insets.bottom }]}>
-      {tabs.map((tab) => {
-        const active = isActive(tab, pathname);
-        const tint = active ? colors.yellow : colors.white;
-        const showDot =
-          (tab.badge === "messages" && unreadChatCount > 0) ||
-          (tab.badge === "requests" && newRequestCount > 0);
-
-        return (
-          <Pressable
+    <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
+      <View style={styles.row}>
+        {tabs.map((tab) => (
+          <TabSlot
             key={tab.key}
-            onPress={() => {
-              // `navigate` returns to a tab's existing screen rather than
-              // pushing a second copy of it.
-              if (!active) router.navigate(tab.href);
-            }}
-            accessibilityRole="tab"
-            accessibilityLabel={tab.label}
-            accessibilityState={{ selected: active }}
-            style={styles.tab}
-          >
-            <View>
-              <Icon
-                name={tab.icon}
-                size={tab.key === "practice" ? 23 : 22}
-                color={tint}
-                strokeWidth={1.9}
-              />
-              {showDot ? <View style={styles.dot} /> : null}
-            </View>
-            <Text style={[styles.label, { color: tint }]} numberOfLines={1}>
-              {tab.label}
-            </Text>
-          </Pressable>
-        );
-      })}
+            tab={tab}
+            active={isTabActive(tab, pathname)}
+            badgeCount={badgeCountFor(tab, unreadChatCount, newRequestCount)}
+            reducedMotion={reducedMotion}
+          />
+        ))}
+      </View>
     </View>
+  );
+}
+
+function badgeCountFor(tab: TabDef, unreadChatCount: number, newRequestCount: number): number {
+  if (tab.badge === "messages") return unreadChatCount;
+  if (tab.badge === "requests") return newRequestCount;
+  return 0;
+}
+
+interface TabSlotProps {
+  tab: TabDef;
+  active: boolean;
+  badgeCount: number;
+  reducedMotion: boolean;
+}
+
+function TabSlot({ tab, active, badgeCount, reducedMotion }: TabSlotProps) {
+  // A resting tab is icon-only, so its name has to reach a screen reader some
+  // other way. The unread count goes in the same label rather than a separate
+  // announcement, which would read as a second control.
+  const accessibilityLabel =
+    badgeCount > 0 ? `${tab.label}, ${badgeCount} unread` : tab.label;
+
+  return (
+    <Animated.View layout={reducedMotion ? undefined : TRANSITION}>
+      <Pressable
+        onPress={() => {
+          // `navigate` returns to a tab's existing screen rather than pushing a
+          // second copy of it.
+          if (!active) router.navigate(tab.href);
+        }}
+        accessibilityRole="tab"
+        accessibilityLabel={accessibilityLabel}
+        accessibilityState={{ selected: active }}
+        style={({ pressed }) => [
+          styles.slot,
+          active ? styles.slotActive : styles.slotResting,
+          pressed && !active && styles.pressed,
+        ]}
+      >
+        <View>
+          <Icon
+            name={tab.icon}
+            // The scales icon reads a shade smaller than the rest of the set.
+            size={tab.key === "practice" ? 23 : 22}
+            color={active ? colors.ink : colors.onDarkMuted}
+            strokeWidth={1.9}
+          />
+          {badgeCount > 0 ? (
+            <View style={[styles.dot, active ? styles.dotOnPill : styles.dotOnBar]} />
+          ) : null}
+        </View>
+        {active ? (
+          <Animated.Text
+            entering={reducedMotion ? undefined : FadeIn.duration(140)}
+            style={styles.label}
+            numberOfLines={1}
+          >
+            {tab.label}
+          </Animated.Text>
+        ) : null}
+      </Pressable>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   bar: {
-    flexDirection: "row",
-    alignItems: "stretch",
-    minHeight: layout.tabBarHeight,
-    paddingHorizontal: 6,
+    paddingTop: spacing.sm,
+    paddingHorizontal: spacing.md,
     backgroundColor: colors.ink,
   },
-  tab: {
-    flex: 1,
-    height: layout.tabBarHeight,
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    height: ROW_HEIGHT,
+  },
+  slot: {
+    height: ROW_HEIGHT,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 4,
+  },
+  slotResting: {
+    width: ICON_SLOT_WIDTH,
+  },
+  slotActive: {
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.full,
+    backgroundColor: colors.yellow,
+  },
+  pressed: {
+    opacity: 0.55,
   },
   label: {
-    ...type.micro,
-    letterSpacing: 0.11,
+    fontFamily: fonts.semibold,
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.ink,
   },
   dot: {
     position: "absolute",
@@ -137,7 +164,15 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: radius.full,
     borderWidth: 2,
-    borderColor: colors.ink,
+  },
+  /** On the ink bar the ring matches the bar, so the yellow reads as a dot. */
+  dotOnBar: {
     backgroundColor: colors.yellow,
+    borderColor: colors.ink,
+  },
+  /** On the yellow pill a yellow dot would vanish, so the pair inverts. */
+  dotOnPill: {
+    backgroundColor: colors.ink,
+    borderColor: colors.yellow,
   },
 });

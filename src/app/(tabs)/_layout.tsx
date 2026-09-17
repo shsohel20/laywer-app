@@ -1,6 +1,6 @@
 // The tab navigator.
 //
-// All seven destinations are registered; AppTabBar renders the five that belong
+// All seven destinations are registered; the tab bar renders the five that belong
 // to the active role. Keeping both roles' tabs in one navigator means switching
 // role is a state change rather than a remount of the whole navigation tree.
 

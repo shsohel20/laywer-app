@@ -1,56 +1,73 @@
-# Welcome to your Expo app 👋
+# Lawey — mobile app
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+An Expo (SDK 56) app for finding and instructing a lawyer. It ships both sides of
+the marketplace: a **client** browses lawyers, sends consultation requests and
+reads law posts; a **lawyer** triages incoming requests, manages availability and
+publishes. The active role decides which tab bar, account screen and alert feed
+you see — switch between them from **Account → View the app as**.
 
-## Get started
-
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Run it
 
 ```bash
-npm run reset-project
+npm install
+npm start          # then press i / a, or scan the QR code with Expo Go
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Other useful scripts:
 
-### Other setup steps
+```bash
+npm run android    # build and run on a connected device or emulator
+npm run ios
+npm run web
+npm run lint
+npx tsc --noEmit   # type check, including route strings
+```
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+## Where things live
 
-## Learn more
+```
+src/
+├── app/                    file-based routes (expo-router)
+│   ├── (auth)/             onboarding, login, signup
+│   ├── (tabs)/             the seven tab destinations
+│   │   ├── (home)/         home + notifications
+│   │   └── posts/          feed + post detail
+│   ├── lawyer/[id].tsx     public lawyer profile
+│   ├── chat/[id].tsx       a conversation
+│   ├── law/                lawyer-side settings screens
+│   └── *.tsx               client-side settings screens
+├── components/
+│   ├── ui/                 design-system primitives
+│   └── law/                feature components
+├── data/                   sample content (stands in for the API)
+├── state/app-state.tsx     client-side application state
+├── theme/                  colours, type scale, spacing
+└── types/                  shared domain types
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+Screens that keep the tab bar visible live inside `(tabs)`; screens that cover it
+(a profile, a thread, any settings page) are registered in the root stack.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Design
 
-## Join the community
+The source of truth is [`design/Law App Mobile Redesign`](design/) — an
+interactive Claude Design prototype covering all 27 screens. The app is built to
+match it: `src/theme` holds the tokens read off that file, and
+`src/components/ui` holds the primitives they compose into. **Change the tokens
+before changing a screen** — every screen is downstream of them.
 
-Join our community of developers creating universal apps.
+Two deliberate departures from the prototype, both noted in the code:
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- Settings rows use icons from our own set rather than the prototype's
+  typographic marks (`◱ ✎ ⚿ …`), which are not in Be Vietnam Pro and would fall
+  back to tofu on Android.
+- Photography was re-encoded from PNG to JPEG at the sizes screens actually
+  render, taking the bundled artwork from 9.3 MB to 1.1 MB.
+
+## Not built yet
+
+There is no backend. Authentication, the request lifecycle, messaging and posts
+are all client-side: `src/data` is static content and `src/state/app-state.tsx`
+holds anything the user changes during a session, which resets on reload.
+Signing in accepts any input. When an API arrives, the types in `src/types` are
+its response shapes and the screens should not need to change.

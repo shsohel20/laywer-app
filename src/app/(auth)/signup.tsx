@@ -17,8 +17,8 @@ export default function SignupScreen() {
 
   const submit = () => {
     signIn(role);
-    // A new lawyer lands on their dashboard, where the verification banner is
-    // the first thing waiting for them.
+    // Either side lands where the verification banner is waiting for them: the
+    // dashboard for a lawyer, the account screen for a client.
     router.replace(isLawyer ? "/practice" : "/");
   };
 
@@ -47,15 +47,15 @@ export default function SignupScreen() {
             <View style={styles.roleBlock}>
               <Text style={styles.roleLabel}>I am a</Text>
               <RoleSelector value={role} onChange={setRole} />
-              {isLawyer ? (
-                <View style={styles.notice}>
-                  <Icon name="alert" size={15} color={colors.amber} />
-                  <Text style={styles.noticeText}>
-                    We verify bar admission before your profile appears in search. You can do
-                    that after signing up.
-                  </Text>
-                </View>
-              ) : null}
+              <View style={styles.notice}>
+                <Icon name="alert" size={15} color={colors.amber} />
+                <Text style={styles.noticeText}>
+                  {isLawyer
+                    ? "We verify your ID and bar admission before your profile appears in search."
+                    : "We verify your ID before your first request reaches a lawyer."}{" "}
+                  You can do that after signing up.
+                </Text>
+              </View>
             </View>
 
             <TextField label="Full name" placeholder="Filips Jonrey" textContentType="name" />

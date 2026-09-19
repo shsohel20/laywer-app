@@ -4,11 +4,11 @@ import { router, type Href } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { PlanBanner } from "@/components/law/PlanUsage";
+import { VerificationBanner } from "@/components/law/VerificationBanner";
 import {
   Avatar,
   Button,
   GroupedList,
-  Icon,
   IconButton,
   LogoMark,
   Pill,
@@ -91,23 +91,7 @@ export default function PracticeScreen() {
         </View>
 
         <View style={styles.gutter}>
-          <Pressable
-            onPress={() => router.push("/law/verification")}
-            accessibilityRole="button"
-            style={({ pressed }) => [styles.verify, pressed && styles.pressed]}
-          >
-            <View style={styles.verifyIcon}>
-              <Icon name="alert" size={18} color={colors.ink} />
-            </View>
-            <View style={styles.verifyBody}>
-              <Text style={styles.verifyTitle}>Verification pending review</Text>
-              <Text style={styles.verifyHint}>
-                Your profile is hidden from search until we confirm your bar admission. One
-                document still outstanding.
-              </Text>
-            </View>
-            <Icon name="chevron-right" size={17} color={colors.ink} />
-          </Pressable>
+          <VerificationBanner />
         </View>
 
         <View style={[styles.gutter, styles.planBanner]}>
@@ -285,41 +269,6 @@ const styles = StyleSheet.create({
     ...type.bodySemi,
     letterSpacing: -0.15,
   },
-  verify: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: spacing.md,
-    paddingVertical: spacing.lg - 2,
-    paddingHorizontal: 15,
-    borderWidth: 1,
-    borderColor: colors.ink,
-    borderRadius: radius.lg,
-    backgroundColor: colors.tint,
-  },
-  verifyIcon: {
-    alignItems: "center",
-    justifyContent: "center",
-    width: 34,
-    height: 34,
-    flexShrink: 0,
-    borderRadius: spacing.sm + 2,
-    backgroundColor: colors.yellow,
-  },
-  verifyBody: {
-    flex: 1,
-    minWidth: 0,
-  },
-  verifyTitle: {
-    ...type.bodySemi,
-    fontSize: 14,
-  },
-  verifyHint: {
-    ...type.caption,
-    fontSize: 12.5,
-    lineHeight: 18,
-    color: colors.amber,
-    marginTop: 3,
-  },
   planBanner: {
     paddingBottom: spacing.lg,
   },
@@ -437,8 +386,5 @@ const styles = StyleSheet.create({
   clear: {
     ...type.lede,
     color: colors.textMuted,
-  },
-  pressed: {
-    opacity: 0.85,
   },
 });

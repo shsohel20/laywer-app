@@ -27,8 +27,18 @@ import {
   LAWYER_ALERTS,
   SEED_MESSAGES,
   planById,
+  verifyDocsFor,
 } from "@/data";
-import type { AreaId, BillingCycle, InboxStatus, Message, PlanId, Role } from "@/types";
+import type {
+  AreaId,
+  BillingCycle,
+  InboxStatus,
+  Message,
+  PlanId,
+  Role,
+  VerifyDoc,
+  VerifyStatus,
+} from "@/types";
 
 export type SortOption = "Nearby" | "Popular";
 
@@ -57,6 +67,22 @@ const INITIAL_AREAS: AreaId[] = ["family", "property", "labour"];
 
 const INITIAL_MY_AREAS = ["Divorce", "Child arrangements", "Maintenance"];
 
+/** One role's identity check. The two sides are checked separately. */
+interface RoleVerification {
+  /** Ids from that role's checklist that have been added. */
+  providedDocIds: string[];
+  status: VerifyStatus;
+}
+
+const INITIAL_VERIFICATION: Record<Role, RoleVerification> = {
+  // A client starts cold, so the app shows the whole check rather than its
+  // happy ending.
+  customer: { providedDocIds: [], status: "unverified" },
+  // A lawyer is part way through — ID and bar admission in, insurance
+  // outstanding. That is what the dashboard banner is there to chase.
+  lawyer: { providedDocIds: ["photo-id", "good-standing"], status: "unverified" },
+};
+
 interface AppStateValue {
   // — Session ——————————————————————————————————————————————
   role: Role;
@@ -68,6 +94,19 @@ interface AppStateValue {
    */
   signIn: (role: Role) => void;
   signOut: () => void;
+
+  // — Identity verification ————————————————————————————————
+  /** The active role's checklist: a client proves ID, a lawyer ID and licence. */
+  verifyDocs: VerifyDoc[];
+  verifyStatus: VerifyStatus;
+  verifyDocsProvided: number;
+  isVerifyDocProvided: (docId: string) => boolean;
+  /** Adds or removes a document. Inert while a reviewer holds the submission. */
+  toggleVerifyDoc: (docId: string) => void;
+  canSubmitVerification: boolean;
+  submitVerification: () => void;
+  /** Pulls a submission back out of review so the documents can be changed. */
+  withdrawVerification: () => void;
 
   // — Shortlist ————————————————————————————————————————————
   savedLawyerIds: string[];
@@ -139,6 +178,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [role, setRoleState] = useState<Role>("customer");
   const [signedIn, setSignedIn] = useState(false);
 
+  const [verification, setVerification] =
+    useState<Record<Role, RoleVerification>>(INITIAL_VERIFICATION);
+
   const [savedLawyerIds, setSavedLawyerIds] = useState<string[]>(INITIAL_SAVED);
   const [areaIds, setAreaIds] = useState<AreaId[]>(INITIAL_AREAS);
   const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
@@ -157,6 +199,48 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [filters, setFilters] = useState<LawyerFilters>(INITIAL_FILTERS);
   // Only messages sent this session; the seeded transcript is prepended on read.
   const [outbox, setOutbox] = useState<Record<string, Message[]>>({});
+
+  const verifyDocs = useMemo(() => verifyDocsFor(role), [role]);
+  const verifyStatus = verification[role].status;
+  const verifyDocsProvided = verification[role].providedDocIds.length;
+  const canSubmitVerification =
+    verifyStatus === "unverified" && verifyDocsProvided === verifyDocs.length;
+
+  const isVerifyDocProvided = useCallback(
+    (docId: string) => verification[role].providedDocIds.includes(docId),
+    [verification, role],
+  );
+
+  const toggleVerifyDoc = useCallback((docId: string) => {
+    setVerification((current) => {
+      // Documents are fixed while a reviewer has them: withdraw first.
+      if (current[role].status !== "unverified") return current;
+      return {
+        ...current,
+        [role]: {
+          ...current[role],
+          providedDocIds: toggle(current[role].providedDocIds, docId),
+        },
+      };
+    });
+  }, [role]);
+
+  const submitVerification = useCallback(() => {
+    setVerification((current) => {
+      const incomplete =
+        current[role].providedDocIds.length < verifyDocsFor(role).length;
+      if (incomplete || current[role].status !== "unverified") return current;
+      return { ...current, [role]: { ...current[role], status: "pending" } };
+    });
+  }, [role]);
+
+  const withdrawVerification = useCallback(() => {
+    setVerification((current) =>
+      current[role].status === "pending"
+        ? { ...current, [role]: { ...current[role], status: "unverified" } }
+        : current,
+    );
+  }, [role]);
 
   const isSaved = useCallback(
     (lawyerId: string) => savedLawyerIds.includes(lawyerId),
@@ -239,6 +323,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setRoleState("customer");
       },
 
+      verifyDocs,
+      verifyStatus,
+      verifyDocsProvided,
+      isVerifyDocProvided,
+      toggleVerifyDoc,
+      canSubmitVerification,
+      submitVerification,
+      withdrawVerification,
+
       savedLawyerIds,
       isSaved,
       toggleSaved: (lawyerId) => setSavedLawyerIds((ids) => toggle(ids, lawyerId)),
@@ -295,6 +388,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     [
       role,
       signedIn,
+      verifyDocs,
+      verifyStatus,
+      verifyDocsProvided,
+      isVerifyDocProvided,
+      toggleVerifyDoc,
+      canSubmitVerification,
+      submitVerification,
+      withdrawVerification,
       savedLawyerIds,
       isSaved,
       areaIds,
@@ -334,6 +435,30 @@ function useAppState(): AppStateValue {
 export function useSession() {
   const { role, setRole, signedIn, signIn, signOut } = useAppState();
   return { role, setRole, signedIn, signIn, signOut };
+}
+
+/** The identity check for whichever role is active. */
+export function useVerification() {
+  const {
+    verifyDocs,
+    verifyStatus,
+    verifyDocsProvided,
+    isVerifyDocProvided,
+    toggleVerifyDoc,
+    canSubmitVerification,
+    submitVerification,
+    withdrawVerification,
+  } = useAppState();
+  return {
+    docs: verifyDocs,
+    status: verifyStatus,
+    providedCount: verifyDocsProvided,
+    isProvided: isVerifyDocProvided,
+    toggleDoc: toggleVerifyDoc,
+    canSubmit: canSubmitVerification,
+    submit: submitVerification,
+    withdraw: withdrawVerification,
+  };
 }
 
 export function useSaved() {

@@ -192,15 +192,26 @@ export interface ScheduleEntry {
   kind: ScheduleKind;
 }
 
-export type VerifyStatus = "VERIFIED" | "CHECKING" | "NEEDED";
+/**
+ * How far an identity check has got. Both sides of the marketplace go through
+ * the same three states — only the documents asked for differ.
+ */
+export type VerifyStatus = "unverified" | "pending" | "verified";
 
+/**
+ * A single document's state, derived from whether it has been added and how far
+ * the submission around it has got. Nothing stores this.
+ */
+export type VerifyDocStatus = "NEEDED" | "ADDED" | "CHECKING" | "VERIFIED";
+
+/** One item on a role's identity checklist. */
 export interface VerifyDoc {
   id: string;
   label: string;
-  meta: string;
-  status: VerifyStatus;
-  /** False means the document has not been provided yet. */
-  provided: boolean;
+  /** What is being asked for. Shown until the document has been added. */
+  requirement: string;
+  /** How the added file reads back: name, size, and what was read off it. */
+  file: string;
 }
 
 export interface Transaction {

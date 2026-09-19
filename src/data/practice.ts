@@ -1,6 +1,6 @@
-// Lawyer-side reference data: today's diary, verification, money and hours.
+// Lawyer-side reference data: today's diary, money and hours.
 
-import type { DayHours, ScheduleEntry, Transaction, VerifyDoc } from "@/types";
+import type { DayHours, ScheduleEntry, Transaction } from "@/types";
 
 export const SCHEDULE: ScheduleEntry[] = [
   {
@@ -34,30 +34,6 @@ export const SCHEDULE: ScheduleEntry[] = [
     title: "Review marked-up draft",
     detail: "Shareholder agreement",
     kind: "TASK",
-  },
-];
-
-export const VERIFY_DOCS: VerifyDoc[] = [
-  {
-    id: "v1",
-    label: "Photo ID",
-    meta: "Passport · uploaded 12 Mar",
-    status: "VERIFIED",
-    provided: true,
-  },
-  {
-    id: "v2",
-    label: "Bar admission certificate",
-    meta: "New York State Bar · uploaded 12 Mar",
-    status: "CHECKING",
-    provided: true,
-  },
-  {
-    id: "v3",
-    label: "Professional indemnity insurance",
-    meta: "Not yet provided",
-    status: "NEEDED",
-    provided: false,
   },
 ];
 

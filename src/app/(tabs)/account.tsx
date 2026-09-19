@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { PlanCard } from "@/components/law/PlanUsage";
 import { RoleSelector } from "@/components/law/RoleSelector";
+import { VerificationBanner } from "@/components/law/VerificationBanner";
 import {
   Avatar,
   Button,
@@ -24,8 +25,10 @@ import {
   CURRENT_USER,
   LAWYER_SETTINGS,
   ME_AS_LAWYER,
+  VERIFY_ICONS,
+  VERIFY_LABELS,
 } from "@/data";
-import { useSaved, useSession, useSubscription } from "@/state/app-state";
+import { useSaved, useSession, useSubscription, useVerification } from "@/state/app-state";
 import { colors, layout, radius, spacing, type } from "@/theme";
 import type { Role } from "@/types";
 
@@ -40,16 +43,23 @@ export default function AccountScreen() {
   const { role, setRole, signOut } = useSession();
   const { savedLawyerIds } = useSaved();
   const { plan } = useSubscription();
+  const { status: verifyStatus } = useVerification();
   const isLawyer = role === "lawyer";
+
+  // The badge follows the identity check, not the role — both sides are
+  // verified, and neither wears the badge until the check has cleared.
+  const badge = {
+    label: VERIFY_LABELS[verifyStatus].toUpperCase(),
+    icon: VERIFY_ICONS[verifyStatus],
+    /** Yellow is reserved for cleared; anything short of it reads softer. */
+    tinted: verifyStatus !== "verified",
+  };
 
   const identity = isLawyer
     ? {
         name: ME_AS_LAWYER.name,
         email: ME_AS_LAWYER.email,
         photo: ME_AS_LAWYER.photo,
-        badge: "PENDING REVIEW",
-        badgeIcon: "clock" as const,
-        badgeTinted: true,
         editLabel: "Edit public profile",
         editHref: "/law/profile" as Href,
         gearHref: "/law/availability" as Href,
@@ -58,9 +68,6 @@ export default function AccountScreen() {
         name: CURRENT_USER.name,
         email: CURRENT_USER.email,
         photo: CURRENT_USER.photo,
-        badge: "ID VERIFIED",
-        badgeIcon: "check" as const,
-        badgeTinted: false,
         editLabel: "Edit profile",
         editHref: "/edit-profile" as Href,
         gearHref: "/notification-settings" as Href,
@@ -109,11 +116,11 @@ export default function AccountScreen() {
                   <View
                     style={[
                       styles.badge,
-                      { backgroundColor: identity.badgeTinted ? colors.tint : colors.yellow },
+                      { backgroundColor: badge.tinted ? colors.tint : colors.yellow },
                     ]}
                   >
-                    <Icon name={identity.badgeIcon} size={10} color={colors.ink} strokeWidth={3} />
-                    <Text style={styles.badgeLabel}>{identity.badge}</Text>
+                    <Icon name={badge.icon} size={10} color={colors.ink} strokeWidth={3} />
+                    <Text style={styles.badgeLabel}>{badge.label}</Text>
                   </View>
                 </View>
                 <Text style={styles.heroEmail} numberOfLines={1}>
@@ -131,6 +138,10 @@ export default function AccountScreen() {
               style={styles.heroButton}
             />
           </InkPanel>
+        </View>
+
+        <View style={styles.gutter}>
+          <VerificationBanner style={styles.verifySlot} />
         </View>
 
         <View style={[styles.gutter, styles.tiles]}>
@@ -174,9 +185,15 @@ export default function AccountScreen() {
                     icon={row.icon}
                     label={row.label}
                     hint={row.hint}
-                    // The subscription row reports the live plan rather than a
-                    // value baked into the settings data.
-                    value={row.id === "subscription" ? plan.name : row.value}
+                    // The subscription and verification rows report live state
+                    // rather than a value baked into the settings data.
+                    value={
+                      row.id === "subscription"
+                        ? plan.name
+                        : row.id === "verification"
+                          ? VERIFY_LABELS[verifyStatus]
+                          : row.value
+                    }
                     onPress={row.href ? () => router.push(row.href as Href) : undefined}
                   />
                   {index < group.rows.length - 1 ? <Rule /> : null}
@@ -277,6 +294,9 @@ const styles = StyleSheet.create({
   heroButton: {
     minHeight: 46,
     borderRadius: radius.sm,
+  },
+  verifySlot: {
+    marginTop: spacing.lg - 2,
   },
   tiles: {
     flexDirection: "row",

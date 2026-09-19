@@ -68,6 +68,13 @@ export const CLIENT_SETTINGS: SettingsGroup[] = [
     title: "Privacy & security",
     rows: [
       {
+        id: "verification",
+        icon: "check",
+        label: "Identity verification",
+        hint: "Confirm who you are before requesting",
+        href: "/verification",
+      },
+      {
         id: "password",
         icon: "lock",
         label: "Password",
@@ -146,9 +153,8 @@ export const LAWYER_SETTINGS: SettingsGroup[] = [
         id: "verification",
         icon: "check",
         label: "Verification",
-        hint: "One document outstanding",
-        value: "PENDING",
-        href: "/law/verification",
+        hint: "ID and practising credentials",
+        href: "/verification",
       },
     ],
   },

@@ -39,6 +39,15 @@ export {
 } from "./requests";
 export { CLIENT_ALERTS, LAWYER_ALERTS } from "./alerts";
 export {
+  CLIENT_VERIFY_DOCS,
+  LAWYER_VERIFY_DOCS,
+  VERIFY_COPY,
+  VERIFY_FORMATS,
+  VERIFY_ICONS,
+  VERIFY_LABELS,
+  verifyDocsFor,
+} from "./verification";
+export {
   CLIENT_SETTINGS,
   LAWYER_SETTINGS,
   NOTIFICATION_GROUPS,
@@ -48,7 +57,6 @@ export {
 } from "./settings";
 export {
   SCHEDULE,
-  VERIFY_DOCS,
   TRANSACTIONS,
   WEEK,
   DEFAULT_WORKING_DAYS,
